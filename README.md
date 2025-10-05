@@ -21,7 +21,7 @@ This system serves as a unified school attendance monitoring platform that inclu
 - **State Management**: React Query for server state
 - **Routing**: React Router v6
 - **Build Tool**: Vite
-- **UI Components**: Custom components with lovable AI-inspired design
+- **UI Components**: Custom components with modern, accessible design
 
 ### Backend (Node.js + Express)
 - **Runtime**: Node.js with TypeScript
@@ -220,7 +220,7 @@ npm run dev
 ## 🎨 UI/UX Design
 
 ### Design Principles
-- **Lovable AI-inspired**: Soft pastel tones, rounded cards
+- **Brand**: Clean, school-friendly visual language
 - **Mobile-first**: Responsive design for all devices
 - **Accessibility**: WCAG compliant components
 - **Modern**: Clean, professional interface

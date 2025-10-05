@@ -109,10 +109,10 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Button variant="outline" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
+          <Button variant="outline" onClick={handleSignOut}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Sign Out
+          </Button>
           </div>
         </div>
       </header>
@@ -143,7 +143,7 @@ export default function Dashboard() {
               >
                 <CardHeader>
                   <PulseIcon pulseColor="success">
-                    <CheckSquare className="h-8 w-8 text-success mb-2" />
+                  <CheckSquare className="h-8 w-8 text-success mb-2" />
                   </PulseIcon>
                   <CardTitle className="text-lg">Mark Attendance</CardTitle>
                   <CardDescription>Record attendance for today</CardDescription>
@@ -160,7 +160,7 @@ export default function Dashboard() {
                 >
                   <CardHeader>
                     <PulseIcon pulseColor="accent">
-                      <BarChart3 className="h-8 w-8 text-accent mb-2" />
+                    <BarChart3 className="h-8 w-8 text-accent mb-2" />
                     </PulseIcon>
                     <CardTitle className="text-lg">Analytics</CardTitle>
                     <CardDescription>Attendance analytics and insights</CardDescription>
@@ -201,7 +201,7 @@ export default function Dashboard() {
               <AnimatedCard delay={0.5} className="cursor-pointer">
                 <CardHeader>
                   <PulseIcon pulseColor="warning">
-                    <Settings className="h-8 w-8 text-warning mb-2" />
+                  <Settings className="h-8 w-8 text-warning mb-2" />
                   </PulseIcon>
                   <CardTitle className="text-lg">Settings</CardTitle>
                   <CardDescription>Configure system settings</CardDescription>
