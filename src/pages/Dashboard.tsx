@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { AIAssistant } from "@/components/AIAssistant";
-import { LogOut, Users, CheckSquare, BarChart3, Settings } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { AnimatedCard, StaggeredContainer, GlowButton, PulseIcon } from "@/components/AnimatedComponents";
+import { LogOut, Users, CheckSquare, BarChart3, Settings, Upload, FileText, Bot, Sparkles } from "lucide-react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -105,78 +107,126 @@ export default function Dashboard() {
             <h1 className="text-2xl font-bold gradient-text">{getRoleTitle()}</h1>
             <p className="text-sm text-muted-foreground">Welcome back, {userName}</p>
           </div>
-          <Button variant="outline" onClick={handleSignOut}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
-          </Button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Button variant="outline" onClick={handleSignOut}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <div className="space-y-6 animate-fade-in">
+        <StaggeredContainer className="space-y-6">
           {/* Welcome Card */}
-          <Card className="card-soft bg-gradient-to-r from-primary/10 to-accent/10">
+          <AnimatedCard variant="glass" className="bg-gradient-to-r from-primary/10 to-accent/10">
             <CardHeader>
-              <CardTitle>Welcome to POD AI</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <PulseIcon pulseColor="primary">
+                  <Sparkles className="h-6 w-6 text-primary" />
+                </PulseIcon>
+                Welcome to POD AI
+              </CardTitle>
               <CardDescription>{getWelcomeMessage()}</CardDescription>
             </CardHeader>
-          </Card>
+          </AnimatedCard>
 
           {/* Quick Actions Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {userRole === "beadle" && (
-              <Card className="card-soft hover:scale-105 transition-transform cursor-pointer">
+              <AnimatedCard 
+                delay={0.1}
+                className="cursor-pointer"
+                onClick={() => navigate("/attendance")}
+              >
                 <CardHeader>
-                  <CheckSquare className="h-8 w-8 text-success mb-2" />
+                  <PulseIcon pulseColor="success">
+                    <CheckSquare className="h-8 w-8 text-success mb-2" />
+                  </PulseIcon>
                   <CardTitle className="text-lg">Mark Attendance</CardTitle>
                   <CardDescription>Record attendance for today</CardDescription>
                 </CardHeader>
-              </Card>
+              </AnimatedCard>
             )}
 
             {(userRole === "adviser" || userRole === "coordinator" || userRole === "admin") && (
               <>
-                <Card className="card-soft hover:scale-105 transition-transform cursor-pointer">
+                <AnimatedCard 
+                  delay={0.2}
+                  className="cursor-pointer"
+                  onClick={() => navigate("/analytics")}
+                >
                   <CardHeader>
-                    <Users className="h-8 w-8 text-primary mb-2" />
-                    <CardTitle className="text-lg">Manage Students</CardTitle>
-                    <CardDescription>View and manage student records</CardDescription>
-                  </CardHeader>
-                </Card>
-
-                <Card className="card-soft hover:scale-105 transition-transform cursor-pointer">
-                  <CardHeader>
-                    <BarChart3 className="h-8 w-8 text-accent mb-2" />
-                    <CardTitle className="text-lg">View Reports</CardTitle>
+                    <PulseIcon pulseColor="accent">
+                      <BarChart3 className="h-8 w-8 text-accent mb-2" />
+                    </PulseIcon>
+                    <CardTitle className="text-lg">Analytics</CardTitle>
                     <CardDescription>Attendance analytics and insights</CardDescription>
                   </CardHeader>
-                </Card>
+                </AnimatedCard>
+
+                <AnimatedCard 
+                  delay={0.3}
+                  className="cursor-pointer"
+                  onClick={() => navigate("/csv-upload")}
+                >
+                  <CardHeader>
+                    <PulseIcon pulseColor="primary">
+                      <Upload className="h-8 w-8 text-primary mb-2" />
+                    </PulseIcon>
+                    <CardTitle className="text-lg">CSV Upload</CardTitle>
+                    <CardDescription>Bulk import student data</CardDescription>
+                  </CardHeader>
+                </AnimatedCard>
+
+                <AnimatedCard 
+                  delay={0.4}
+                  className="cursor-pointer"
+                  onClick={() => navigate("/file-storage")}
+                >
+                  <CardHeader>
+                    <PulseIcon pulseColor="warning">
+                      <FileText className="h-8 w-8 text-warning mb-2" />
+                    </PulseIcon>
+                    <CardTitle className="text-lg">File Storage</CardTitle>
+                    <CardDescription>Manage documents and reports</CardDescription>
+                  </CardHeader>
+                </AnimatedCard>
               </>
             )}
 
             {(userRole === "coordinator" || userRole === "admin") && (
-              <Card className="card-soft hover:scale-105 transition-transform cursor-pointer">
+              <AnimatedCard delay={0.5} className="cursor-pointer">
                 <CardHeader>
-                  <Settings className="h-8 w-8 text-warning mb-2" />
+                  <PulseIcon pulseColor="warning">
+                    <Settings className="h-8 w-8 text-warning mb-2" />
+                  </PulseIcon>
                   <CardTitle className="text-lg">Settings</CardTitle>
                   <CardDescription>Configure system settings</CardDescription>
                 </CardHeader>
-              </Card>
+              </AnimatedCard>
             )}
           </div>
 
-          {/* Feature Coming Soon Notice */}
-          <Card className="card-soft">
+          {/* AI Assistant Notice */}
+          <AnimatedCard delay={0.6} variant="neon">
             <CardHeader>
-              <CardTitle>🚀 Full Features Coming Soon</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <PulseIcon pulseColor="primary">
+                  <Bot className="h-6 w-6 text-primary" />
+                </PulseIcon>
+                AI Assistant Ready
+              </CardTitle>
               <CardDescription>
-                Role-specific dashboards with complete attendance management, analytics, and AI-powered insights are being built. 
-                Try the AI assistant to see a preview of what's coming!
+                Your AI assistant is now powered with real attendance data analysis! 
+                Click the chat button in the bottom right to get insights about attendance patterns, 
+                trends, and student performance.
               </CardDescription>
             </CardHeader>
-          </Card>
-        </div>
+          </AnimatedCard>
+        </StaggeredContainer>
       </main>
 
       {/* AI Assistant */}

@@ -1,12 +1,16 @@
 import { useState } from "react";
-import { MessageCircle, X, Send } from "lucide-react";
+import { MessageCircle, X, Send, Bot, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  timestamp?: Date;
+  isLoading?: boolean;
 }
 
 export function AIAssistant() {
@@ -14,25 +18,152 @@ export function AIAssistant() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hello! I'm your POD AI assistant. How can I help you with attendance monitoring today?",
+      content: "Hello! I'm your POD AI assistant. I can help you with attendance insights, student data analysis, and answer questions about your school's attendance patterns. What would you like to know?",
+      timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const getAttendanceInsights = async (query: string): Promise<string> => {
+    try {
+      // Get recent attendance data
+      const { data: attendanceData } = await supabase
+        .from("attendance")
+        .select(`
+          date,
+          status,
+          students!inner(first_name, last_name, student_number),
+          sections!inner(name, grade_level)
+        `)
+        .gte("date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+        .order("date", { ascending: false })
+        .limit(100);
 
-    const userMessage: Message = { role: "user", content: input };
+      if (!attendanceData || attendanceData.length === 0) {
+        return "I don't have any recent attendance data to analyze. Please make sure attendance records have been entered.";
+      }
+
+      // Calculate basic statistics
+      const totalRecords = attendanceData.length;
+      const presentCount = attendanceData.filter(r => r.status === 'present').length;
+      const absentCount = totalRecords - presentCount;
+      const attendanceRate = totalRecords > 0 ? (presentCount / totalRecords) * 100 : 0;
+
+      // Get unique students
+      const uniqueStudents = new Set(attendanceData.map(r => r.students.student_number)).size;
+
+      // Analyze patterns
+      const recentDays = attendanceData.slice(0, 7);
+      const recentPresent = recentDays.filter(r => r.status === 'present').length;
+      const recentRate = recentDays.length > 0 ? (recentPresent / recentDays.length) * 100 : 0;
+
+      // Generate insights based on query
+      const lowerQuery = query.toLowerCase();
+      
+      if (lowerQuery.includes('rate') || lowerQuery.includes('percentage')) {
+        return `Based on the last 30 days of data:\n\n📊 **Overall Attendance Rate**: ${attendanceRate.toFixed(1)}%\n📈 **Recent Trend (7 days)**: ${recentRate.toFixed(1)}%\n👥 **Total Students**: ${uniqueStudents}\n📅 **Records Analyzed**: ${totalRecords}\n\n${recentRate > attendanceRate ? '✅ Attendance is improving recently!' : recentRate < attendanceRate ? '⚠️ Attendance has declined recently.' : '📊 Attendance is stable.'}`;
+      }
+
+      if (lowerQuery.includes('absent') || lowerQuery.includes('missing')) {
+        const absentStudents = attendanceData.filter(r => r.status === 'absent');
+        const frequentAbsentees = absentStudents.reduce((acc, record) => {
+          const student = record.students;
+          const key = `${student.first_name} ${student.last_name}`;
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+
+        const topAbsentees = Object.entries(frequentAbsentees)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 3);
+
+        return `📉 **Absence Analysis**:\n\n• Total Absences: ${absentCount}\n• Absence Rate: ${((absentCount / totalRecords) * 100).toFixed(1)}%\n\n🔍 **Students with Most Absences**:\n${topAbsentees.map(([name, count]) => `• ${name}: ${count} days`).join('\n')}\n\n💡 **Recommendation**: Consider reaching out to students with frequent absences to understand any challenges they might be facing.`;
+      }
+
+      if (lowerQuery.includes('trend') || lowerQuery.includes('pattern')) {
+        const dailyStats = attendanceData.reduce((acc, record) => {
+          const date = record.date;
+          if (!acc[date]) {
+            acc[date] = { present: 0, total: 0 };
+          }
+          acc[date].total++;
+          if (record.status === 'present') {
+            acc[date].present++;
+          }
+          return acc;
+        }, {} as Record<string, { present: number; total: number }>);
+
+        const dailyRates = Object.entries(dailyStats)
+          .map(([date, stats]) => ({
+            date,
+            rate: (stats.present / stats.total) * 100
+          }))
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .slice(-7);
+
+        const trendDirection = dailyRates.length > 1 
+          ? dailyRates[dailyRates.length - 1].rate > dailyRates[0].rate ? 'improving' : 'declining'
+          : 'stable';
+
+        return `📈 **Attendance Trend Analysis**:\n\n• **Overall Rate**: ${attendanceRate.toFixed(1)}%\n• **Recent Trend**: ${trendDirection}\n• **Last 7 Days**:\n${dailyRates.map(d => `  ${new Date(d.date).toLocaleDateString()}: ${d.rate.toFixed(1)}%`).join('\n')}\n\n${trendDirection === 'improving' ? '🎉 Great! Attendance is trending upward.' : trendDirection === 'declining' ? '⚠️ Attendance is declining - consider intervention strategies.' : '📊 Attendance is stable.'}`;
+      }
+
+      // Default response with general insights
+      return `📊 **Attendance Overview**:\n\n• **Overall Rate**: ${attendanceRate.toFixed(1)}%\n• **Total Students**: ${uniqueStudents}\n• **Records**: ${totalRecords} entries\n• **Recent Performance**: ${recentRate.toFixed(1)}% (last 7 days)\n\n💡 **Quick Insights**:\n${attendanceRate >= 90 ? '✅ Excellent attendance rate!' : attendanceRate >= 80 ? '👍 Good attendance rate' : '⚠️ Attendance needs attention'}\n\nAsk me about specific patterns, trends, or student performance!`;
+
+    } catch (error) {
+      console.error("Error fetching attendance data:", error);
+      return "I'm having trouble accessing the attendance data right now. Please try again later.";
+    }
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+
+    const userMessage: Message = { 
+      role: "user", 
+      content: input,
+      timestamp: new Date()
+    };
     setMessages((prev) => [...prev, userMessage]);
     
-    // Mock AI response (to be connected to real AI later)
-    setTimeout(() => {
-      const aiResponse: Message = {
+    setIsLoading(true);
+    const loadingMessage: Message = {
         role: "assistant",
-        content: "I'm here to help! This AI feature will be fully connected soon to provide attendance insights and answer your questions.",
-      };
-      setMessages((prev) => [...prev, aiResponse]);
-    }, 1000);
+      content: "",
+      isLoading: true,
+      timestamp: new Date()
+    };
+    setMessages((prev) => [...prev, loadingMessage]);
+
+    try {
+      // Generate AI response based on query
+      const aiResponse = await getAttendanceInsights(input);
+      
+      // Remove loading message and add real response
+      setMessages((prev) => {
+        const withoutLoading = prev.filter(m => !m.isLoading);
+        return [...withoutLoading, {
+          role: "assistant",
+          content: aiResponse,
+          timestamp: new Date()
+        }];
+      });
+
+    } catch (error) {
+      console.error("Error generating AI response:", error);
+      setMessages((prev) => {
+        const withoutLoading = prev.filter(m => !m.isLoading);
+        return [...withoutLoading, {
+          role: "assistant",
+          content: "I'm sorry, I encountered an error while processing your request. Please try again.",
+          timestamp: new Date()
+        }];
+      });
+    } finally {
+      setIsLoading(false);
+    }
 
     setInput("");
   };
@@ -79,14 +210,41 @@ export function AIAssistant() {
                   key={index}
                   className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <div
-                    className={`max-w-[80%] rounded-lg p-3 ${
+                  <div className="flex items-start gap-2 max-w-[80%]">
+                    {message.role === "assistant" && (
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mt-1">
+                        <Bot className="h-3 w-3 text-primary" />
+                      </div>
+                    )}
+                    <div
+                      className={`rounded-lg p-3 ${
                       message.role === "user"
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
-                    <p className="text-sm">{message.content}</p>
+                      {message.isLoading ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 w-2 bg-current rounded-full animate-bounce" />
+                          <div className="h-2 w-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                          <div className="h-2 w-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          {message.timestamp && (
+                            <p className="text-xs opacity-70 mt-1">
+                              {message.timestamp.toLocaleTimeString()}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {message.role === "user" && (
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mt-1">
+                        <User className="h-3 w-3 text-primary" />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -105,7 +263,7 @@ export function AIAssistant() {
                     handleSend();
                   }
                 }}
-                placeholder="Ask about attendance..."
+                placeholder="Ask about attendance patterns, rates, trends..."
                 className="min-h-[60px] resize-none"
               />
               <Button

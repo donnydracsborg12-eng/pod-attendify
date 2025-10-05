@@ -1,0 +1,143 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AppRole {
+  beadle
+  adviser
+  coordinator
+  admin
+}
+
+enum AttendanceStatus {
+  present
+  absent
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  fullName  String   @map("full_name")
+  role      AppRole  @default(beadle)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  sectionsAsAdviser Section[]
+  attendanceRecords AttendanceRecord[]
+  auditLogs         AuditLog[]
+  uploadedFiles     StoredFile[]
+
+  @@map("users")
+}
+
+model Section {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  gradeLevel String   @map("grade_level")
+  schoolYear String   @map("school_year")
+  adviserId  String?  @map("adviser_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  adviser  User?      @relation(fields: [adviserId], references: [id], onDelete: SetNull)
+  students Student[]
+  attendanceRecords AttendanceRecord[]
+
+  @@map("sections")
+}
+
+model Student {
+  id          String   @id @default(cuid())
+  studentNumber String  @unique @map("student_number")
+  firstName   String   @map("first_name")
+  lastName    String   @map("last_name")
+  middleName  String?  @map("middle_name")
+  sectionId   String   @map("section_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  section           Section            @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  attendanceRecords AttendanceRecord[]
+
+  @@map("students")
+}
+
+model AttendanceRecord {
+  id         String           @id @default(cuid())
+  studentId  String           @map("student_id")
+  sectionId  String           @map("section_id")
+  date       DateTime         @db.Date
+  status     AttendanceStatus
+  proofUrl   String?          @map("proof_url")
+  submittedBy String          @map("submitted_by")
+  notes      String?
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  student     Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  section     Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  submittedByUser User @relation(fields: [submittedBy], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, date])
+  @@map("attendance_records")
+}
+
+model StoredFile {
+  id          String   @id @default(cuid())
+  name        String
+  size        Int
+  type        String
+  url         String
+  uploadedBy  String   @map("uploaded_by")
+  description String?
+  category    String   @default("other")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  uploadedByUser User @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@map("stored_files")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  action    String
+  tableName String   @map("table_name")
+  recordId  String?  @map("record_id")
+  oldData   Json?
+  newData   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
+
+model NotificationSchedule {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  schedule    String   // cron expression
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("notification_schedules")
+}

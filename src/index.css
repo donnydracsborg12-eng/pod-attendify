@@ -1,9 +1,17 @@
+@import '@fontsource/poppins/400.css';
+@import '@fontsource/poppins/500.css';
+@import '@fontsource/poppins/600.css';
+@import '@fontsource/poppins/700.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* POD AI Monitoring Assistant Design System
+   Based on Lovable AI aesthetic with proper design tokens
 */
 
 @layer base {
@@ -102,20 +110,102 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-gradient-to-br from-[hsl(var(--background))] to-[hsl(250,60%,96%)] text-foreground antialiased;
+    @apply bg-gradient-to-br from-[hsl(var(--background))] to-[hsl(220,60%,96%)] text-foreground antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+  }
+
+  .dark body {
+    @apply bg-gradient-to-br from-[hsl(var(--background))] to-[hsl(220,40%,8%)];
   }
 }
 
 @layer utilities {
+  /* Enhanced Card System */
   .card-soft {
-    @apply rounded-[var(--radius)] bg-card shadow-[var(--shadow-md)] transition-[var(--transition-smooth)] hover:shadow-[var(--shadow-lg)];
+    @apply rounded-[var(--radius)] bg-card/80 backdrop-blur-sm border border-[hsl(var(--card-border))] shadow-[var(--shadow-md)] transition-[var(--transition-smooth)] hover:shadow-[var(--shadow-lg)] hover:scale-[1.02];
   }
 
+  .card-glass {
+    @apply rounded-[var(--radius-lg)] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/20 shadow-[var(--shadow-glow)];
+  }
+
+  /* Enhanced Button System */
   .btn-primary {
-    @apply bg-primary text-primary-foreground hover:opacity-90 rounded-[var(--radius)] transition-[var(--transition-smooth)];
+    @apply bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 rounded-[var(--radius)] transition-[var(--transition-bounce)] hover:scale-105 shadow-[var(--shadow-md)] hover:shadow-[var(--shadow-glow)];
   }
 
+  .btn-neon {
+    @apply bg-gradient-to-r from-secondary to-primary text-primary-foreground rounded-[var(--radius)] transition-[var(--transition-bounce)] hover:scale-105 shadow-[var(--shadow-neon)] hover:shadow-[var(--shadow-glow)];
+  }
+
+  /* Typography */
   .gradient-text {
     @apply bg-gradient-to-r from-primary via-[hsl(280,75%,68%)] to-accent bg-clip-text text-transparent;
   }
+
+  .text-glow {
+    text-shadow: 0 0 10px hsl(var(--primary) / 0.5);
+  }
+
+  /* Animations */
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Layout */
+  .container-pod {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Glassmorphic Effects */
+  .glass {
+    @apply bg-white/10 backdrop-blur-md border border-white/20;
+  }
+
+  .glass-dark {
+    @apply bg-black/10 backdrop-blur-md border border-white/10;
+  }
+}
+
+/* Custom Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes glow {
+  from { box-shadow: 0 0 20px hsl(var(--primary) / 0.3); }
+  to { box-shadow: 0 0 30px hsl(var(--primary) / 0.6); }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary));
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary-hover));
 }
