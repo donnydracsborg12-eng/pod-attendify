@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Upload, Download, FileText, Image, File, Trash2, Eye, Plus } from "lucide-react";
+import { Upload, Download, FileText, Image, File, Trash2, Eye, Plus } from "lucide-react";
+import Header from "@/components/Header";
 
 interface StoredFile {
   id: string;
@@ -232,27 +233,11 @@ export default function FileStorage() {
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold gradient-text">File Storage</h1>
-              <p className="text-sm text-muted-foreground">
-                Manage documents, photos, and reports
-              </p>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-6">
-        <div className="space-y-6">
+    <div className="min-h-screen bg-background flex flex-col">
+      <Header />
+      
+      <main className="flex-1 overflow-y-auto">
+        <div className="container-pod py-6">
           {/* Upload Dialog */}
           <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
             <DialogTrigger asChild>

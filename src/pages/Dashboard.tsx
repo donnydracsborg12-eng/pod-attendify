@@ -1,19 +1,20 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { AIAssistant } from "@/components/AIAssistant";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { AnimatedCard, StaggeredContainer, GlowButton, PulseIcon } from "@/components/AnimatedComponents";
-import { LogOut, Users, CheckSquare, BarChart3, Settings, Upload, FileText, Bot, Sparkles } from "lucide-react";
+import { AnimatedCard, StaggeredContainer, PulseIcon } from "@/components/AnimatedComponents";
+import { CheckSquare, BarChart3, Settings, Upload, FileText, Bot, Sparkles } from "lucide-react";
+import Header from "@/components/Header";
+import Sidebar from "@/components/Sidebar";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>("");
   const [userName, setUserName] = useState<string>("");
+  const [userEmail, setUserEmail] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -42,6 +43,7 @@ export default function Dashboard() {
       } else if (profile) {
         setUserRole(profile.role);
         setUserName(profile.full_name);
+        setUserEmail(session.user.email || "");
       }
 
       setIsLoading(false);
@@ -99,27 +101,19 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold gradient-text">{getRoleTitle()}</h1>
-            <p className="text-sm text-muted-foreground">Welcome back, {userName}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-          <Button variant="outline" onClick={handleSignOut}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
-          </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <StaggeredContainer className="space-y-6">
+    <div className="min-h-screen flex flex-col">
+      <Header 
+        showAIAssistant={userRole === 'coordinator'} 
+        onAIClick={() => {/* AI Assistant shown as floating component */}}
+      />
+      
+      <div className="flex flex-1">
+        <Sidebar userRole={userRole} />
+        
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="container-pod py-8">
+            <StaggeredContainer className="space-y-6">
           {/* Welcome Card */}
           <AnimatedCard variant="glass" className="bg-gradient-to-r from-primary/10 to-accent/10">
             <CardHeader>
@@ -226,11 +220,13 @@ export default function Dashboard() {
               </CardDescription>
             </CardHeader>
           </AnimatedCard>
-        </StaggeredContainer>
-      </main>
+            </StaggeredContainer>
+          </div>
+        </main>
+      </div>
 
-      {/* AI Assistant */}
-      <AIAssistant />
+      {/* AI Assistant - floating for coordinator */}
+      {userRole === 'coordinator' && <AIAssistant />}
     </div>
   );
 }
