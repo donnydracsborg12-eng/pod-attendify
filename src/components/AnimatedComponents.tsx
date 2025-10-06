@@ -7,13 +7,15 @@ interface AnimatedCardProps {
   className?: string;
   delay?: number;
   variant?: "soft" | "glass" | "neon";
+  onClick?: () => void;
 }
 
 export function AnimatedCard({ 
   children, 
   className, 
   delay = 0, 
-  variant = "soft" 
+  variant = "soft",
+  onClick
 }: AnimatedCardProps) {
   const variants = {
     soft: "card-soft",
@@ -37,7 +39,8 @@ export function AnimatedCard({
         y: -5,
         transition: { duration: 0.2 }
       }}
-      className={cn(variants[variant], className)}
+      onClick={onClick}
+      className={cn(variants[variant], onClick && "cursor-pointer", className)}
     >
       {children}
     </motion.div>

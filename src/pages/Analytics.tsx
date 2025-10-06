@@ -161,12 +161,16 @@ export default function Analytics() {
         }
 
         const studentStats = studentMap.get(student.id)!;
-        studentStats.total_days++;
-        if (student.attendance.status === 'present') {
-          studentStats.present_days++;
-        } else {
-          studentStats.absent_days++;
-        }
+        // attendance is an array, iterate through it
+        const attendanceArray = Array.isArray(student.attendance) ? student.attendance : [student.attendance];
+        attendanceArray.forEach((att: any) => {
+          studentStats.total_days++;
+          if (att.status === 'present') {
+            studentStats.present_days++;
+          } else {
+            studentStats.absent_days++;
+          }
+        });
       });
 
       // Calculate attendance rates

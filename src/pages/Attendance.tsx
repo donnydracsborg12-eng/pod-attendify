@@ -105,8 +105,8 @@ export default function Attendance() {
             existingAttendance?.forEach(record => {
               attendanceMap[record.student_id] = {
                 student_id: record.student_id,
-                status: record.status,
-                notes: record.notes
+                status: (record.status as 'present' | 'absent'),
+                notes: record.notes || undefined
               };
             });
 
