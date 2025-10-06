@@ -79,7 +79,7 @@ class MinIOService {
         buffer = file;
       }
 
-      const uploadInfo = await this.client.putObject(
+      const etag = await this.client.putObject(
         bucketName,
         objectName,
         buffer,
@@ -92,7 +92,7 @@ class MinIOService {
 
       const url = await this.getFileUrl(bucketName, objectName);
       
-      return { url, etag: uploadInfo.etag || '' };
+      return { url, etag };
     } catch (error) {
       console.error('Failed to upload file:', error);
       throw error;

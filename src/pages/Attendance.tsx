@@ -9,8 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle, Clock, Users, Calendar } from "lucide-react";
-import Header from "@/components/Header";
+import { ArrowLeft, CheckCircle, XCircle, Clock, Users, Calendar } from "lucide-react";
 
 interface Student {
   id: string;
@@ -224,11 +223,27 @@ export default function Attendance() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <Header />
-      
-      <main className="flex-1 overflow-y-auto">
-        <div className="container-pod py-6">
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-card/50 backdrop-blur">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => navigate("/dashboard")}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold gradient-text">Mark Attendance</h1>
+              <p className="text-sm text-muted-foreground">
+                {section?.name} - {section?.grade_level} ({section?.school_year})
+              </p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-6">
+        <div className="space-y-6">
           {/* Date Selection and Summary */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
