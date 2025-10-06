@@ -119,14 +119,14 @@ export default function FileStorage() {
 
       // Upload file to Supabase Storage
       const { error: uploadError } = await supabase.storage
-        .from('files')
+        .from('attendance-files')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       // Get public URL
       const { data: urlData } = supabase.storage
-        .from('files')
+        .from('attendance-files')
         .getPublicUrl(filePath);
 
       // Save file metadata to database
@@ -182,7 +182,7 @@ export default function FileStorage() {
       // Delete from storage
       const filePath = file.url.split('/').pop();
       await supabase.storage
-        .from('files')
+        .from('attendance-files')
         .remove([`uploads/${filePath}`]);
 
       // Delete from database
