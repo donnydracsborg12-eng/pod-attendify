@@ -3,13 +3,29 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, CheckCircle, XCircle, Clock, Users, Calendar } from "lucide-react";
+import { ArrowLeft, CheckCircle, Upload, TrendingUp, MessageCircle, Send, Bot, Check } from "lucide-react";
+import { ProofUploadModal } from "@/components/ProofUploadModal";
+import { Progress } from "@/components/ui/progress";
+import { AnimatedCard } from "@/components/AnimatedComponents";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 interface Student {
   id: string;
@@ -22,8 +38,10 @@ interface Student {
 
 interface AttendanceRecord {
   student_id: string;
-  status: 'present' | 'absent';
-  notes?: string;
+  present: boolean;
+  absent: boolean;
+  proof_url?: string;
+  saving?: boolean;
 }
 
 interface Section {
@@ -39,38 +57,27 @@ export default function Attendance() {
   const [students, setStudents] = useState<Student[]>([]);
   const [section, setSection] = useState<Section | null>(null);
   const [attendanceRecords, setAttendanceRecords] = useState<Record<string, AttendanceRecord>>({});
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
+  const [aiMessage, setAiMessage] = useState("");
+  const [aiResponse, setAiResponse] = useState("");
+  const [weeklyTrend, setWeeklyTrend] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Get current user's profile to determine which section they manage
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
           navigate("/auth");
           return;
         }
 
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
-
-        if (!profile) {
-          toast({
-            title: "Error",
-            description: "User profile not found",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // For now, let's get the first section for demonstration
-        // In a real app, you'd filter by user's assigned section
+        // Get first section
         const { data: sections } = await supabase
           .from("sections")
           .select("*")
@@ -80,37 +87,41 @@ export default function Attendance() {
           const currentSection = sections[0];
           setSection(currentSection);
 
-          // Fetch students for this section
+          // Fetch students
           const { data: studentsData, error } = await supabase
             .from("students")
             .select("*")
             .eq("section_id", currentSection.id)
             .order("last_name");
 
-          if (error) {
-            throw error;
-          }
+          if (error) throw error;
 
           setStudents(studentsData || []);
 
-          // Load existing attendance for the selected date
-          if (studentsData) {
-            const { data: existingAttendance } = await supabase
-              .from("attendance")
-              .select("*")
-              .eq("section_id", currentSection.id)
-              .eq("date", selectedDate);
+          // Initialize attendance records
+          const initialRecords: Record<string, AttendanceRecord> = {};
+          studentsData?.forEach(student => {
+            initialRecords[student.id] = {
+              student_id: student.id,
+              present: false,
+              absent: false,
+            };
+          });
+          setAttendanceRecords(initialRecords);
 
-            const attendanceMap: Record<string, AttendanceRecord> = {};
-            existingAttendance?.forEach(record => {
-              attendanceMap[record.student_id] = {
-                student_id: record.student_id,
-                status: (record.status as 'present' | 'absent'),
-                notes: record.notes || undefined
-              };
-            });
+          // Calculate weekly trend
+          const weekAgo = new Date();
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          const { data: weeklyData } = await supabase
+            .from("attendance")
+            .select("status")
+            .eq("section_id", currentSection.id)
+            .gte("date", weekAgo.toISOString().split('T')[0]);
 
-            setAttendanceRecords(attendanceMap);
+          if (weeklyData) {
+            const presentCount = weeklyData.filter(r => r.status === 'present').length;
+            const totalCount = weeklyData.length;
+            setWeeklyTrend(totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0);
           }
         }
       } catch (error) {
@@ -126,30 +137,49 @@ export default function Attendance() {
     };
 
     fetchData();
-  }, [navigate, toast, selectedDate]);
+  }, [navigate, toast]);
 
-  const handleAttendanceChange = (studentId: string, status: 'present' | 'absent') => {
+  const handleToggle = async (studentId: string, type: 'present' | 'absent') => {
+    const record = attendanceRecords[studentId];
+    const newValue = type === 'present' ? !record.present : !record.absent;
+    
     setAttendanceRecords(prev => ({
       ...prev,
       [studentId]: {
         ...prev[studentId],
-        student_id: studentId,
-        status,
-        notes: prev[studentId]?.notes || ""
+        [type]: newValue,
+        [type === 'present' ? 'absent' : 'present']: false,
+        saving: true,
       }
     }));
+
+    // Simulate instant save animation
+    setTimeout(() => {
+      setAttendanceRecords(prev => ({
+        ...prev,
+        [studentId]: {
+          ...prev[studentId],
+          saving: false,
+        }
+      }));
+    }, 500);
   };
 
-  const handleNotesChange = (studentId: string, notes: string) => {
-    setAttendanceRecords(prev => ({
-      ...prev,
-      [studentId]: {
-        ...prev[studentId],
-        student_id: studentId,
-        status: prev[studentId]?.status || 'present',
-        notes
-      }
-    }));
+  const handleUploadClick = (student: Student) => {
+    setSelectedStudent(student);
+    setUploadModalOpen(true);
+  };
+
+  const handleUploadComplete = (url: string) => {
+    if (selectedStudent) {
+      setAttendanceRecords(prev => ({
+        ...prev,
+        [selectedStudent.id]: {
+          ...prev[selectedStudent.id],
+          proof_url: url,
+        }
+      }));
+    }
   };
 
   const handleSubmit = async () => {
@@ -158,38 +188,42 @@ export default function Attendance() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session || !section) return;
 
-      const records = Object.values(attendanceRecords);
-      
-      // Delete existing records for this date and section
+      const records = Object.entries(attendanceRecords)
+        .filter(([_, record]) => record.present || record.absent)
+        .map(([studentId, record]) => ({
+          student_id: studentId,
+          section_id: section.id,
+          date: selectedDate,
+          status: record.present ? 'present' : 'absent',
+          proof_url: record.proof_url || null,
+          submitted_by: session.user.id,
+        }));
+
+      if (records.length === 0) {
+        toast({
+          title: "No records to submit",
+          description: "Please mark attendance for at least one student",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Delete existing records for this date
       await supabase
         .from("attendance")
         .delete()
         .eq("section_id", section.id)
         .eq("date", selectedDate);
 
-      // Insert new records
-      const attendanceData = records.map(record => ({
-        student_id: record.student_id,
-        section_id: section.id,
-        date: selectedDate,
-        status: record.status,
-        notes: record.notes || null,
-        submitted_by: session.user.id
-      }));
-
       const { error } = await supabase
         .from("attendance")
-        .insert(attendanceData);
+        .insert(records);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: `Attendance recorded for ${records.length} students`,
-      });
-
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
     } catch (error) {
       console.error("Error submitting attendance:", error);
       toast({
@@ -202,14 +236,28 @@ export default function Attendance() {
     }
   };
 
-  const filteredStudents = students.filter(student =>
-    `${student.first_name} ${student.last_name} ${student.student_number}`.toLowerCase()
-      .includes(searchTerm.toLowerCase())
-  );
+  const handleAiMessage = async () => {
+    if (!aiMessage.trim()) return;
 
-  const presentCount = Object.values(attendanceRecords).filter(r => r.status === 'present').length;
-  const absentCount = Object.values(attendanceRecords).filter(r => r.status === 'absent').length;
-  const totalCount = students.length;
+    setAiResponse("Analyzing attendance data...");
+    
+    // Simulate AI response
+    setTimeout(() => {
+      const markedCount = Object.values(attendanceRecords).filter(r => r.present || r.absent).length;
+      const totalCount = students.length;
+      const submissionPercent = totalCount > 0 ? Math.round((markedCount / totalCount) * 100) : 0;
+      
+      setAiResponse(`📊 **Attendance Summary**\n\n✅ Marked: ${markedCount}/${totalCount} students (${submissionPercent}%)\n📈 Weekly Trend: ${weeklyTrend}%\n\n${submissionPercent === 100 ? "🎉 All students marked! Ready to submit." : "⚠️ Some students still need to be marked."}`);
+    }, 1000);
+
+    setAiMessage("");
+  };
+
+  const submissionPercent = students.length > 0 
+    ? Math.round((Object.values(attendanceRecords).filter(r => r.present || r.absent).length / students.length) * 100)
+    : 0;
+
+  const isComplete = submissionPercent === 100;
 
   if (isLoading) {
     return (
@@ -225,15 +273,15 @@ export default function Attendance() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur">
+      <header className="border-b border-border bg-card/50 backdrop-blur sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" onClick={() => navigate("/dashboard")}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              Back
             </Button>
             <div>
-              <h1 className="text-2xl font-bold gradient-text">Mark Attendance</h1>
+              <h1 className="text-2xl font-bold gradient-text">Beadle Dashboard</h1>
               <p className="text-sm text-muted-foreground">
                 {section?.name} - {section?.grade_level} ({section?.school_year})
               </p>
@@ -244,144 +292,138 @@ export default function Attendance() {
 
       <main className="container mx-auto px-4 py-6">
         <div className="space-y-6">
-          {/* Date Selection and Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Date
-                </CardTitle>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <AnimatedCard
+              className={cn(
+                "transition-all duration-300",
+                isComplete ? "bg-blue-500/10 border-blue-500" : "bg-red-500/10 border-red-500"
+              )}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Today's Submission</CardTitle>
               </CardHeader>
               <CardContent>
-                <Input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full"
-                />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-3xl font-bold">{submissionPercent}%</span>
+                    <CheckCircle className={cn(
+                      "h-8 w-8",
+                      isComplete ? "text-blue-500" : "text-red-500"
+                    )} />
+                  </div>
+                  <Progress value={submissionPercent} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    {Object.values(attendanceRecords).filter(r => r.present || r.absent).length} / {students.length} students marked
+                  </p>
+                </div>
               </CardContent>
-            </Card>
+            </AnimatedCard>
 
-            <Card>
-              <CardHeader className="pb-2">
+            <AnimatedCard>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Total Students
+                  <TrendingUp className="h-4 w-4" />
+                  Weekly Trend
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{totalCount}</div>
+                <div className="space-y-2">
+                  <div className="text-3xl font-bold">{weeklyTrend}%</div>
+                  <Progress value={weeklyTrend} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    Average attendance rate (last 7 days)
+                  </p>
+                </div>
               </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  Present
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{presentCount}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <XCircle className="h-4 w-4 text-red-500" />
-                  Absent
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">{absentCount}</div>
-              </CardContent>
-            </Card>
+            </AnimatedCard>
           </div>
 
-          {/* Search */}
+          {/* Attendance Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Student List</CardTitle>
+              <CardTitle>Attendance Table</CardTitle>
               <CardDescription>
-                Mark attendance for each student. Use the search to find specific students.
+                Mark attendance for each student. Toggle checkboxes to mark present/absent and upload proof.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <Input
-                  placeholder="Search students by name or student number..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full"
-                />
-
-                <div className="space-y-2">
-                  {filteredStudents.map((student) => {
-                    const record = attendanceRecords[student.id];
-                    const isPresent = record?.status === 'present';
-                    const isAbsent = record?.status === 'absent';
-
-                    return (
-                      <Card key={student.id} className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[300px]">Student Name</TableHead>
+                      <TableHead className="text-center">Present</TableHead>
+                      <TableHead className="text-center">Absent</TableHead>
+                      <TableHead className="text-center">Proof Upload</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {students.map((student) => {
+                      const record = attendanceRecords[student.id];
+                      return (
+                        <TableRow key={student.id} className={cn(
+                          "transition-colors",
+                          record?.saving && "bg-primary/5"
+                        )}>
+                          <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
-                              <Checkbox
-                                checked={isPresent}
-                                onCheckedChange={(checked) => 
-                                  handleAttendanceChange(student.id, checked ? 'present' : 'absent')
-                                }
-                              />
-                              <Label className="text-sm font-medium">
-                                {student.first_name} {student.last_name}
-                                {student.middle_name && ` ${student.middle_name}`}
-                              </Label>
+                              {record?.saving && (
+                                <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
+                              )}
+                              {student.first_name} {student.last_name}
+                              {student.middle_name && ` ${student.middle_name}`}
                             </div>
-                            <Badge variant="outline">{student.student_number}</Badge>
-                          </div>
-
-                          <div className="flex items-center gap-2">
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex justify-center">
+                              <Checkbox
+                                checked={record?.present || false}
+                                onCheckedChange={() => handleToggle(student.id, 'present')}
+                                className={cn(
+                                  "h-6 w-6 transition-all",
+                                  record?.present && "data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+                                )}
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex justify-center">
+                              <Checkbox
+                                checked={record?.absent || false}
+                                onCheckedChange={() => handleToggle(student.id, 'absent')}
+                                className={cn(
+                                  "h-6 w-6 transition-all",
+                                  record?.absent && "data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500"
+                                )}
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
                             <Button
-                              variant={isPresent ? "default" : "outline"}
+                              variant="outline"
                               size="sm"
-                              onClick={() => handleAttendanceChange(student.id, 'present')}
-                              className="text-green-600"
+                              onClick={() => handleUploadClick(student)}
+                              className="gap-2"
                             >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Present
+                              {record?.proof_url ? (
+                                <>
+                                  <Check className="h-4 w-4 text-green-500" />
+                                  Uploaded
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="h-4 w-4" />
+                                  Upload Proof
+                                </>
+                              )}
                             </Button>
-                            <Button
-                              variant={isAbsent ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => handleAttendanceChange(student.id, 'absent')}
-                              className="text-red-600"
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Absent
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div className="mt-3">
-                          <Textarea
-                            placeholder="Add notes (optional)..."
-                            value={record?.notes || ""}
-                            onChange={(e) => handleNotesChange(student.id, e.target.value)}
-                            className="min-h-[60px]"
-                          />
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
-
-                {filteredStudents.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No students found matching your search.
-                  </div>
-                )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
@@ -390,25 +432,101 @@ export default function Attendance() {
           <div className="flex justify-end">
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || Object.keys(attendanceRecords).length === 0}
+              disabled={isSubmitting}
               size="lg"
-              className="bg-gradient-to-r from-primary to-accent"
-            >
-              {isSubmitting ? (
-                <>
-                  <Clock className="h-4 w-4 mr-2 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Submit Attendance
-                </>
+              className={cn(
+                "relative transition-all",
+                !isComplete && "shadow-[0_0_20px_rgba(59,130,246,0.5)] animate-pulse"
               )}
+            >
+              {!isComplete && (
+                <span className="absolute inset-0 rounded-md bg-blue-400 opacity-75 blur-lg animate-pulse" />
+              )}
+              <span className="relative flex items-center gap-2">
+                {isSubmitting ? "Submitting..." : "Submit Attendance"}
+              </span>
             </Button>
           </div>
         </div>
       </main>
+
+      {/* AI Assistant Bubble */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {!aiChatOpen ? (
+          <Button
+            onClick={() => setAiChatOpen(true)}
+            size="lg"
+            className="h-14 w-14 rounded-full shadow-lg hover:scale-110 transition-transform"
+          >
+            <Bot className="h-6 w-6" />
+          </Button>
+        ) : (
+          <Card className="w-80 shadow-2xl">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Bot className="h-4 w-4" />
+                  AI Assistant
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAiChatOpen(false)}
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {aiResponse && (
+                <div className="bg-muted p-3 rounded-lg text-sm whitespace-pre-line">
+                  {aiResponse}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Did everyone submit today?"
+                  value={aiMessage}
+                  onChange={(e) => setAiMessage(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAiMessage()}
+                  className="flex-1"
+                />
+                <Button onClick={handleAiMessage} size="icon">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Success Dialog */}
+      <AlertDialog open={showSuccess} onOpenChange={setShowSuccess}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-green-500 flex items-center justify-center">
+              <CheckCircle className="h-8 w-8 text-white" />
+            </div>
+            <AlertDialogTitle className="text-center">Success!</AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              ✅ Attendance Saved Successfully
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Upload Modal */}
+      {selectedStudent && section && (
+        <ProofUploadModal
+          open={uploadModalOpen}
+          onOpenChange={setUploadModalOpen}
+          studentId={selectedStudent.id}
+          studentName={`${selectedStudent.first_name} ${selectedStudent.last_name}`}
+          sectionId={section.id}
+          date={selectedDate}
+          onUploadComplete={handleUploadComplete}
+        />
+      )}
     </div>
   );
 }
