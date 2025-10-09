@@ -151,6 +151,22 @@ export default function Dashboard() {
               </AnimatedCard>
             )}
 
+            {userRole === "adviser" && (
+              <AnimatedCard 
+                delay={0.2}
+                className="cursor-pointer"
+                onClick={() => navigate("/adviser-dashboard")}
+              >
+                <CardHeader>
+                  <PulseIcon pulseColor="accent">
+                  <Users className="h-8 w-8 text-accent mb-2" />
+                  </PulseIcon>
+                  <CardTitle className="text-lg">Adviser Dashboard</CardTitle>
+                  <CardDescription>Manage students and view alerts</CardDescription>
+                </CardHeader>
+              </AnimatedCard>
+            )}
+
             {(userRole === "adviser" || userRole === "coordinator" || userRole === "admin") && (
               <>
                 <AnimatedCard 
